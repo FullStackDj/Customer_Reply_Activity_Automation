@@ -108,3 +108,87 @@ class MailCustomerReplyActivityRule(models.Model):
         "CHECK(deadline_count >= 0)",
         "Reaction time cannot be negative.",
     )
+
+    @api.onchange("model_id")
+    def _onchange_model_id(self):
+        for rule in self:
+            if rule.responsible_field_id.model_id != rule.model_id:
+                rule.responsible_field_id = False
+            if (
+                rule.activity_type_id.res_model
+                and rule.activity_type_id.res_model != rule.model
+            ):
+                rule.activity_type_id = False
+
+    @api.constrains("model_id")
+    def _check_model_capabilities(self):
+        for rule in self:
+            if (
+                not rule.model_id.is_mail_thread
+                or not rule.model_id.is_mail_activity
+                or rule.model_id.transient
+            ):
+                raise ValidationError(
+                    self.env._(
+                        "The selected model must support both chatter and activities "
+                        "and must not be transient."
+                    )
+                )
+
+            if rule.model not in self.env:
+                raise ValidationError(
+                    self.env._(
+                        "The selected model is not available in the current registry."
+                    )
+                )
+
+    @api.constrains("model_id", "responsible_field_id")
+    def _check_responsible_field(self):
+        for rule in self:
+            field = rule.responsible_field_id
+
+            if (
+                field.model_id != rule.model_id
+                or field.ttype not in {"many2one", "many2many"}
+                or field.relation != "res.users"
+            ):
+                raise ValidationError(
+                    self.env._(
+                        "The responsible field must belong to the selected model "
+                        "and point to Users."
+                    )
+                )
+
+    @api.constrains("fallback_user_id")
+    def _check_fallback_user(self):
+        for rule in self:
+            user = rule.fallback_user_id
+
+            if user and (not user.active or not user._is_internal()):
+                raise ValidationError(
+                    self.env._(
+                        "The fallback responsible must be an active internal user."
+                    )
+                )
+
+    @api.constrains("model_id", "activity_type_id")
+    def _check_activity_type_model(self):
+        for rule in self:
+            activity_type = rule.activity_type_id
+
+            if activity_type and not activity_type.active:
+                raise ValidationError(
+                    self.env._("The activity type must be active.")
+                )
+
+            if (
+                activity_type
+                and activity_type.res_model
+                and activity_type.res_model != rule.model
+            ):
+                raise ValidationError(
+                    self.env._(
+                        "The activity type must be generic or configured "
+                        "for the selected model."
+                    )
+                )
