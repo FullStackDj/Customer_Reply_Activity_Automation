@@ -163,3 +163,76 @@ class MailThread(models.AbstractModel):
                     record_id,
                     user.id,
                 )
+
+    @api.model
+    def _customer_reply_get_responsible_users(self, rule, record):
+        field_name = rule.responsible_field_id.name
+        field = record._fields.get(field_name)
+        users = self.env["res.users"].sudo().with_context(active_test=False)
+        if field and field.type in {"many2one", "many2many"} and field.comodel_name == "res.users":
+            configured_users = record[field_name].sudo().with_context(active_test=False)
+            users = configured_users.filtered(lambda user: user.active and user._is_internal())
+
+        fallback = rule.fallback_user_id.sudo().with_context(active_test=False)
+        if not users and fallback and fallback.active and fallback._is_internal():
+            users = fallback
+
+        unique_ids = sorted(set(users.ids))
+        return self.env["res.users"].sudo().with_context(active_test=False).browse(unique_ids)
+
+    @api.model
+    def _customer_reply_schedule_activity(self, rule, record, user, source_message):
+        activity = self.env["mail.activity"].sudo()
+        if rule.merge_replies:
+            self._customer_reply_advisory_lock(
+                "activity",
+                rule.id,
+                record._name,
+                record.id,
+                user.id,
+            )
+            activity = self.env["mail.activity"].sudo().search(
+                [
+                    ("active", "=", True),
+                    ("customer_reply_rule_id", "=", rule.id),
+                    ("res_model", "=", record._name),
+                    ("res_id", "=", record.id),
+                    ("user_id", "=", user.id),
+                ],
+                order="id",
+                limit=1,
+            )
+
+        received_at = fields.Datetime.now()
+        count = (activity.customer_reply_count or 1) + 1 if activity else 1
+        note = self._customer_reply_activity_note(source_message, count, received_at)
+        values = {
+            "activity_type_id": rule.activity_type_id.id,
+            "summary": self.env._("Customer replied — response required"),
+            "note": note,
+            "customer_reply_count": count,
+            "customer_reply_last_message_id": source_message.id,
+            "customer_reply_last_received_at": received_at,
+        }
+
+        if activity:
+            activity.write(values)
+        else:
+            activity = record.with_context(
+                mail_activity_automation_skip=False,
+                mail_activity_quick_update=True,
+            ).activity_schedule(
+                date_deadline=self._customer_reply_deadline(rule, user),
+                user_id=user.id,
+                customer_reply_rule_id=rule.id,
+                **values,
+            )
+
+        if activity:
+            try:
+                with self.env.cr.savepoint():
+                    activity.sudo().action_notify()
+            except Exception:
+                _logger.exception("Failed to notify user %s about customer reply activity %s", user.id, activity.id)
+
+        return activity
