@@ -1,5 +1,9 @@
+from fnmatch import fnmatchcase
+import hashlib
 import logging
+import re
 
+from dateutil.relativedelta import relativedelta
 from markupsafe import Markup
 
 from odoo import api, fields, models
@@ -90,3 +94,72 @@ class MailThread(models.AbstractModel):
             for model_name, record_id in sorted(route_keys)
             if model_name in rules_by_model
         ]
+
+    @api.model
+    def _customer_reply_process_candidate(self, message, message_dict, rule, model_name, record_id):
+        rule = rule.exists()
+        if not rule or not rule.active or model_name not in self.env:
+            return
+        record = self.env[model_name].sudo().browse(record_id).exists()
+        if not record or not hasattr(record, "activity_schedule"):
+            return
+
+        source_message = self.env["mail.message"].sudo().search(
+            [
+                ("message_id", "=", message_dict.get("message_id")),
+                ("model", "=", model_name),
+                ("res_id", "=", record_id),
+                ("message_type", "=", "email"),
+            ],
+            order="id desc",
+            limit=1,
+        )
+        if not source_message or source_message.is_internal:
+            return
+        if rule.ignore_automatic_messages and self._customer_reply_is_automatic(message):
+            return
+
+        sender = email_normalize(source_message.email_from or message_dict.get("email_from"), strict=False)
+        if not sender:
+            _logger.warning(
+                "Skipped customer reply activity for %s,%s because the sender address is invalid",
+                model_name,
+                record_id,
+            )
+            return
+        if self._customer_reply_address_is_excluded(sender, rule.excluded_addresses):
+            return
+        if self._customer_reply_sender_is_internal(sender, source_message.author_id.id):
+            return
+
+        activity_type = rule.activity_type_id
+        if not activity_type.active or activity_type.res_model not in {False, model_name}:
+            _logger.warning(
+                "Skipped customer reply activity for %s,%s because rule %s has an invalid activity type",
+                model_name,
+                record_id,
+                rule.id,
+            )
+            return
+
+        users = self._customer_reply_get_responsible_users(rule, record)
+        if not users:
+            _logger.warning(
+                "Skipped customer reply activity for %s,%s because rule %s has no responsible user",
+                model_name,
+                record_id,
+                rule.id,
+            )
+            return
+
+        for user in users:
+            try:
+                with self.env.cr.savepoint():
+                    self._customer_reply_schedule_activity(rule, record, user, source_message)
+            except Exception:
+                _logger.exception(
+                    "Failed to schedule customer reply activity for %s,%s and user %s",
+                    model_name,
+                    record_id,
+                    user.id,
+                )
