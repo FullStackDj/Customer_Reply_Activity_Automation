@@ -236,3 +236,126 @@ class MailThread(models.AbstractModel):
                 _logger.exception("Failed to notify user %s about customer reply activity %s", user.id, activity.id)
 
         return activity
+
+    @api.model
+    def _customer_reply_deadline(self, rule, user):
+        base_date = fields.Date.context_today(rule.with_context(tz=user.tz or self.env.context.get("tz")))
+        return base_date + relativedelta(**{rule.deadline_unit: rule.deadline_count})
+
+    @api.model
+    def _customer_reply_activity_note(self, source_message, count, received_at):
+        sender = source_message.email_from or self.env._("Unknown sender")
+        subject = source_message.subject or self.env._("No subject")
+        received = fields.Datetime.to_string(received_at)
+        return Markup(
+            "<p><strong>%s</strong></p>"
+            "<ul>"
+            "<li><strong>%s</strong> %s</li>"
+            "<li><strong>%s</strong> %s</li>"
+            "<li><strong>%s</strong> %s</li>"
+            "<li><strong>%s</strong> %s</li>"
+            "</ul>"
+        ) % (
+            self.env._("Customer reply received"),
+            self.env._("From:"),
+            sender,
+            self.env._("Subject:"),
+            subject,
+            self.env._("Received:"),
+            received,
+            self.env._("Replies in this activity:"),
+            count,
+        )
+
+    @api.model
+    def _customer_reply_sender_is_internal(self, sender, author_id=False):
+        partner = self.env["res.partner"].sudo().browse(author_id).exists()
+        if partner:
+            partner_users = partner.with_context(active_test=False).user_ids
+            if any(user._is_internal() for user in partner_users):
+                return True
+
+        normalized = email_normalize(sender, strict=False)
+        if not normalized:
+            return False
+        matching_users = self.env["res.users"].sudo().with_context(active_test=False).search(
+            [("partner_id.email_normalized", "=", normalized)]
+        )
+        return any(user._is_internal() for user in matching_users)
+
+    @api.model
+    def _customer_reply_address_is_excluded(self, sender, patterns):
+        normalized = email_normalize(sender, strict=False)
+        if not normalized:
+            return False
+        _local_part, separator, domain = normalized.partition("@")
+        if not separator:
+            return False
+
+        for raw_pattern in re.split(r"[\s,;]+", patterns or ""):
+            pattern = raw_pattern.strip().lower()
+            if not pattern:
+                continue
+            if pattern.startswith("@"):
+                if fnmatchcase(domain, pattern[1:]):
+                    return True
+            elif "@" not in pattern:
+                if fnmatchcase(domain, pattern):
+                    return True
+            elif fnmatchcase(normalized, pattern):
+                return True
+        return False
+
+    @api.model
+    def _customer_reply_is_automatic(self, message):
+        auto_submitted = self._customer_reply_header_values(message, "Auto-Submitted")
+        if any(value.split(";", 1)[0].strip() not in {"", "no"} for value in auto_submitted):
+            return True
+
+        precedence = {
+            token
+            for value in self._customer_reply_header_values(message, "Precedence")
+            for token in re.split(r"[\s,;]+", value)
+            if token
+        }
+        if precedence.intersection({"auto-reply", "auto_reply", "bulk", "junk", "list"}):
+            return True
+
+        automatic_headers = {
+            "X-Autoreply",
+            "X-Auto-Reply",
+            "X-Autorespond",
+            "X-Autoresponse",
+            "X-Auto-Response",
+            "X-Auto-Response-From",
+            "X-Autoreply-From",
+            "X-Mail-Autoreply",
+            "X-MS-Exchange-Inbox-Rules-Loop",
+            "X-MS-Exchange-Generated-Message-Source",
+            "X-Loop",
+            "List-Id",
+            "List-Unsubscribe",
+        }
+        if any(self._customer_reply_header_values(message, header) for header in automatic_headers):
+            return True
+
+        return_path = self._customer_reply_header_values(message, "Return-Path")
+        if any(value.replace(" ", "") == "<>" for value in return_path):
+            return True
+        return message.get_content_type() == "multipart/report"
+
+    @api.model
+    def _customer_reply_header_values(self, message, header):
+        return [str(value).strip().lower() for value in message.get_all(header, [])]
+
+    @api.model
+    def _customer_reply_advisory_lock(self, namespace, *parts):
+        source = "\x1f".join(
+            [self.env.cr.dbname, "mail_customer_reply_activity", namespace, *(str(part) for part in parts)]
+        )
+        lock_key = int.from_bytes(
+            hashlib.blake2b(source.encode(), digest_size=8).digest(),
+            byteorder="big",
+            signed=True,
+        )
+        self.env.cr.execute("SELECT pg_advisory_xact_lock(%s)", [lock_key])
