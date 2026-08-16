@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_mail_customer_reply_activity_rule"
+              name="Customer Reply Activities"
+              parent="base.menu_email"
+              action="action_mail_customer_reply_activity_rule"
+              sequence="7"
+              groups="base.group_system"/>
+</odoo>

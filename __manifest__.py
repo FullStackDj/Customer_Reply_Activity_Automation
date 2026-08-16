@@ -15,6 +15,7 @@ Inventory, Project, and custom chatter-enabled models.
     "data": [
         "security/ir.model.access.csv",
         "data/mail_activity_type_data.xml",
+        "views/mail_menus.xml",
     ],
     "installable": True,
     "application": True,
