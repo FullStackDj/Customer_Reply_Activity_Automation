@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_customer_reply_activity" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.customer.reply.activity</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="mail.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//setting[@id='activities_setting']" position="after">
+                <setting id="customer_reply_activities_setting"
+                         string="Customer Reply Activities"
+                         help="Create activities when external contacts reply to record-related emails">
+                    <div class="content-group">
+                        <div class="mt8">
+                            <button name="%(action_mail_customer_reply_activity_rule)d"
+                                    string="Configure Customer Reply Activities"
+                                    type="action"
+                                    class="oe_link"
+                                    icon="oi-arrow-right"/>
+                        </div>
+                    </div>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>
