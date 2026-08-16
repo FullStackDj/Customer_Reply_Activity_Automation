@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_mail_customer_reply_activity_rule_system,mail.customer.reply.activity.rule system,model_mail_customer_reply_activity_rule,base.group_system,1,1,1,1

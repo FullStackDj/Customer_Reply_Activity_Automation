@@ -13,6 +13,7 @@ Inventory, Project, and custom chatter-enabled models.
     "author": "full.stack.odoo@gmail.com",
     "depends": ["mail"],
     "data": [
+        "security/ir.model.access.csv",
         "data/mail_activity_type_data.xml",
     ],
     "installable": True,
