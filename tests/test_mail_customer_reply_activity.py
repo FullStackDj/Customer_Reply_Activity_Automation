@@ -137,3 +137,53 @@ class TestMailCustomerReplyActivity(TransactionCase):
                 self._email("X-Auto-Response-Suppress: All\r\n")
             )
         )
+
+    def test_excluded_address_patterns(self):
+        thread = self.env["mail.thread"]
+        patterns = (
+            "exact@example.com\n"
+            "@blocked.example\n"
+            "*.notifications.example\n"
+            "no-reply@*"
+        )
+
+        self.assertTrue(
+            thread._customer_reply_address_is_excluded(
+                "exact@example.com", patterns
+            )
+        )
+        self.assertTrue(
+            thread._customer_reply_address_is_excluded(
+                "user@blocked.example", patterns
+            )
+        )
+        self.assertTrue(
+            thread._customer_reply_address_is_excluded(
+                "robot@eu.notifications.example", patterns
+            )
+        )
+        self.assertTrue(
+            thread._customer_reply_address_is_excluded(
+                "no-reply@allowed.example", patterns
+            )
+        )
+        self.assertFalse(
+            thread._customer_reply_address_is_excluded(
+                "customer@allowed.example", patterns
+            )
+        )
+
+    def test_internal_sender_detection(self):
+        thread = self.env["mail.thread"]
+
+        self.assertTrue(
+            thread._customer_reply_sender_is_internal(
+                self.test_user.email,
+                self.test_user.partner_id.id,
+            )
+        )
+        self.assertFalse(
+            thread._customer_reply_sender_is_internal(
+                "new.customer@example.invalid"
+            )
+        )
