@@ -15,6 +15,7 @@ Inventory, Project, and custom chatter-enabled models.
     "data": [
         "security/ir.model.access.csv",
         "data/mail_activity_type_data.xml",
+        "views/mail_customer_reply_activity_rule_views.xml",
         "views/res_config_settings_views.xml",
         "views/mail_menus.xml",
     ],

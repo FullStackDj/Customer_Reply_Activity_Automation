@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="mail_customer_reply_activity_rule_view_list" model="ir.ui.view">
+        <field name="name">mail.customer.reply.activity.rule.view.list</field>
+        <field name="model">mail.customer.reply.activity.rule</field>
+        <field name="arch" type="xml">
+            <list string="Customer Reply Activities" default_order="sequence, model_id">
+                <field name="sequence" widget="handle"/>
+                <field name="active" widget="boolean_toggle"/>
+                <field name="model_id"/>
+                <field name="responsible_field_id"/>
+                <field name="fallback_user_id" widget="many2one_avatar_user" optional="show"/>
+                <field name="activity_type_id"/>
+                <field name="deadline_count"/>
+                <field name="deadline_unit"/>
+                <field name="merge_replies" optional="show"/>
+                <field name="ignore_automatic_messages" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="mail_customer_reply_activity_rule_view_form" model="ir.ui.view">
+        <field name="name">mail.customer.reply.activity.rule.view.form</field>
+        <field name="model">mail.customer.reply.activity.rule</field>
+        <field name="arch" type="xml">
+            <form string="Customer Reply Activity Rule">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <field name="model" invisible="1"/>
+                    <div class="oe_title">
+                        <label for="model_id"/>
+                        <h1>
+                            <field name="model_id" options="{'no_create': True, 'no_open': True}"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Assignment">
+                            <field name="responsible_field_id"
+                                   domain="[('model_id', '=', model_id), ('relation', '=', 'res.users'), ('ttype', 'in', ['many2one', 'many2many'])]"
+                                   options="{'no_create': True, 'no_open': True}"/>
+                            <field name="fallback_user_id" widget="many2one_avatar_user" options="{'no_create': True}"/>
+                            <field name="activity_type_id"
+                                   domain="[('active', '=', True), ('res_model', 'in', [False, model])]"
+                                   options="{'no_create': True}"/>
+                        </group>
+                        <group string="Reaction">
+                            <label for="deadline_count" string="Reaction Time"/>
+                            <div class="o_row">
+                                <field name="deadline_count" class="oe_inline"/>
+                                <field name="deadline_unit" class="oe_inline"/>
+                            </div>
+                            <field name="merge_replies"/>
+                            <field name="ignore_automatic_messages"/>
+                            <field name="sequence" groups="base.group_no_one"/>
+                        </group>
+                    </group>
+                    <group string="Sender Exclusions">
+                        <field name="excluded_addresses" nolabel="1" placeholder="billing-bot@example.com&#10;@automated.example.com&#10;*.notifications.example.com"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="mail_customer_reply_activity_rule_view_search" model="ir.ui.view">
+        <field name="name">mail.customer.reply.activity.rule.view.search</field>
+        <field name="model">mail.customer.reply.activity.rule</field>
+        <field name="arch" type="xml">
+            <search string="Customer Reply Activities">
+                <field name="model_id"/>
+                <field name="responsible_field_id"/>
+                <field name="activity_type_id"/>
+                <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_mail_customer_reply_activity_rule" model="ir.actions.act_window">
+        <field name="name">Customer Reply Activities</field>
+        <field name="res_model">mail.customer.reply.activity.rule</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="mail_customer_reply_activity_rule_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Configure the first customer reply activity rule</p>
+            <p>Each external email reply creates an actionable activity for the responsible user.</p>
+        </field>
+    </record>
+</odoo>
