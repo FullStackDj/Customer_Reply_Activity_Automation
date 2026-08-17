@@ -230,3 +230,43 @@ class TestMailCustomerReplyActivity(TransactionCase):
 
         self.assertEqual(len(activities), 2)
         self.assertEqual(len(activities.filtered("active")), 1)
+
+    def test_merge_can_be_disabled(self):
+        self.rule.merge_replies = False
+        parent = self._post_parent_message()
+
+        self._process_reply(parent, "customer-reply-separate-1@example.com")
+        self._process_reply(parent, "customer-reply-separate-2@example.com")
+
+        self.assertEqual(len(self._activities()), 2)
+
+    def test_automatic_and_internal_replies_are_ignored(self):
+        parent = self._post_parent_message()
+
+        self._process_reply(
+            parent,
+            "automatic-reply@example.com",
+            extra_headers="Auto-Submitted: auto-replied\r\n",
+        )
+        self._process_reply(
+            parent,
+            "internal-reply@example.com",
+            sender=self.test_user.email,
+        )
+
+        self.assertFalse(self._activities())
+
+    def test_fallback_responsible(self):
+        target = self.env["res.partner"].create(
+            {
+                "name": "Customer Reply Target",
+                "email": "target@example.com",
+            }
+        )
+        parent = self._post_parent_message(target)
+
+        self._process_reply(parent, "fallback-reply@example.com")
+        activity = self._activities(target)
+
+        self.assertEqual(len(activity), 1)
+        self.assertEqual(activity.user_id, self.test_user)
