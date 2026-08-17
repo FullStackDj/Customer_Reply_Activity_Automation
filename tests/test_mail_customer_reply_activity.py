@@ -187,3 +187,46 @@ class TestMailCustomerReplyActivity(TransactionCase):
                 "new.customer@example.invalid"
             )
         )
+
+    def test_external_reply_creates_and_merges_activity(self):
+        parent = self._post_parent_message()
+
+        self._process_reply(parent, "customer-reply-1@example.com")
+        activities = self._activities()
+
+        self.assertEqual(len(activities), 1)
+        self.assertTrue(activities.active)
+        self.assertEqual(activities.user_id, self.test_user)
+        self.assertEqual(activities.customer_reply_count, 1)
+        self.assertEqual(
+            activities.summary,
+            "Customer replied — response required",
+        )
+
+        first_deadline = activities.date_deadline
+
+        self._process_reply(parent, "customer-reply-2@example.com")
+        activities = self._activities()
+
+        self.assertEqual(len(activities), 1)
+        self.assertEqual(activities.customer_reply_count, 2)
+        self.assertEqual(activities.date_deadline, first_deadline)
+        self.assertEqual(
+            activities.customer_reply_last_message_id.message_id,
+            "<customer-reply-2@example.com>",
+        )
+
+    def test_completed_activity_is_not_merged(self):
+        parent = self._post_parent_message()
+
+        self._process_reply(parent, "customer-reply-done-1@example.com")
+        first_activity = self._activities()
+        first_activity.action_done()
+
+        self.assertFalse(first_activity.active)
+
+        self._process_reply(parent, "customer-reply-done-2@example.com")
+        activities = self._activities()
+
+        self.assertEqual(len(activities), 2)
+        self.assertEqual(len(activities.filtered("active")), 1)
