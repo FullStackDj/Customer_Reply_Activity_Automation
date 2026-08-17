@@ -98,3 +98,42 @@ class TestMailCustomerReplyActivity(TransactionCase):
             ],
             order="id",
         )
+
+    def test_activity_type_is_available(self):
+        self.assertTrue(self.activity_type.active)
+        self.assertFalse(self.activity_type.res_model)
+
+    def test_automatic_message_headers(self):
+        thread = self.env["mail.thread"]
+
+        self.assertFalse(thread._customer_reply_is_automatic(self._email()))
+        self.assertFalse(
+            thread._customer_reply_is_automatic(
+                self._email("Auto-Submitted: no\r\n")
+            )
+        )
+        self.assertTrue(
+            thread._customer_reply_is_automatic(
+                self._email("Auto-Submitted: auto-replied\r\n")
+            )
+        )
+        self.assertTrue(
+            thread._customer_reply_is_automatic(
+                self._email("Precedence: bulk\r\n")
+            )
+        )
+        self.assertTrue(
+            thread._customer_reply_is_automatic(
+                self._email("X-Autoreply: yes\r\n")
+            )
+        )
+        self.assertTrue(
+            thread._customer_reply_is_automatic(
+                self._email("List-Id: customers.example.com\r\n")
+            )
+        )
+        self.assertFalse(
+            thread._customer_reply_is_automatic(
+                self._email("X-Auto-Response-Suppress: All\r\n")
+            )
+        )
