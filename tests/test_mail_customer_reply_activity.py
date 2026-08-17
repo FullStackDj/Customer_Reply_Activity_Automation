@@ -45,3 +45,56 @@ class TestMailCustomerReplyActivity(TransactionCase):
             }
         )
         cls.target = cls.test_user.partner_id
+
+    def _email(self, extra_headers="", content_type="text/plain"):
+        raw = (
+            "From: Customer <customer@example.com>\r\n"
+            "To: replies@example.com\r\n"
+            "Subject: Re: Proposal\r\n"
+            "Message-Id: <customer-reply@example.com>\r\n"
+            f"Content-Type: {content_type}\r\n"
+            f"{extra_headers}"
+            "\r\n"
+            "Reply body"
+        )
+        return email.message_from_string(raw, policy=email.policy.SMTP)
+
+    def _post_parent_message(self, target=None):
+        return (target or self.target).message_post(
+            body="Proposal",
+            subject="Proposal",
+            message_type="comment",
+            subtype_xmlid="mail.mt_comment",
+        )
+
+    def _process_reply(
+        self,
+        parent,
+        message_id,
+        sender="customer@example.com",
+        extra_headers="",
+    ):
+        raw = (
+            f"From: Customer <{sender}>\r\n"
+            "To: replies@example.com\r\n"
+            "Subject: Re: Proposal\r\n"
+            f"Message-Id: <{message_id}>\r\n"
+            f"In-Reply-To: {parent.message_id}\r\n"
+            f"References: {parent.message_id}\r\n"
+            f"{extra_headers}"
+            "Content-Type: text/plain; charset=utf-8\r\n"
+            "\r\n"
+            "Customer reply"
+        )
+        self.env["mail.thread"].sudo().message_process(None, raw)
+
+    def _activities(self, target=None):
+        target = target or self.target
+        return self.env["mail.activity"].with_context(active_test=False).search(
+            [
+                ("customer_reply_rule_id", "=", self.rule.id),
+                ("res_model", "=", target._name),
+                ("res_id", "=", target.id),
+            ],
+            order="id",
+        )
