@@ -79,3 +79,69 @@ Key Features
 * Standard Odoo chatter, activities, notification preferences, access rights,
   and completion behavior.
 * Database protection against duplicate messages and concurrent merges.
+
+Requirements and Installation
+-----------------------------
+
+The module can be installed in Odoo environments that allow custom Python
+modules, including Odoo.sh, on-premise installations, and other self-hosted
+deployments. Odoo Online does not support custom Python modules.
+
+#. Copy ``mail_customer_reply_activity`` into an Odoo add-ons path.
+#. Restart the Odoo service and update the Apps list.
+#. Install **Customer Reply Activity**.
+#. Open the rule configuration and create at least one active rule.
+
+A working inbound mail route is required. Before configuring the module, send
+an email from an Odoo record, reply from an external mailbox, and confirm that
+the answer returns to the original record chatter.
+
+An outgoing mail server is needed only for notifications delivered by email.
+The activity can still be created and shown in Odoo when email delivery is not
+enabled.
+
+Configuration
+-------------
+
+Rules are available from either menu path:
+
+* **Settings -> General Settings -> Discuss -> Customer Reply Activities**
+* **Settings -> Technical -> Email -> Customer Reply Activities**
+
+Only system administrators can manage rules. One active rule is allowed for
+each model. Archive the current rule before activating its replacement.
+
+Rule Fields
+~~~~~~~~~~~
+
+**Model**
+  The model whose routed replies should create activities. Only non-transient
+  models supporting chatter and activities are available.
+
+**Responsible Field**
+  A ``Many2one`` or ``Many2many`` field on the selected model pointing to
+  ``res.users``. Only active internal users are eligible for assignment.
+
+**Fallback Responsible**
+  An optional active internal user used when the Responsible Field contains no
+  eligible user. It is a second assignment level, not an additional recipient.
+
+**Activity Type**
+  An active generic activity type or one assigned to the selected model. The
+  module includes a generic **Customer Reply** activity type.
+
+**Reaction Time**
+  A non-negative whole number of calendar days, weeks, or months added to the
+  reply date in the responsible user's timezone. Zero means the current date.
+
+**Merge Replies**
+  Updates one matching open activity when enabled. Creates a separate activity
+  for every eligible reply when disabled.
+
+**Ignore Automatic Messages**
+  Stops recognized automatic replies, bulk messages, mailing-list traffic,
+  delivery reports, and mail loops from creating activities.
+
+**Excluded Addresses**
+  Sender addresses or patterns separated by new lines, spaces, commas, or
+  semicolons. Matching is case-insensitive after sender normalization.
