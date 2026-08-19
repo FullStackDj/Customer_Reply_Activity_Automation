@@ -201,3 +201,85 @@ does not move because the first reply started the responsibility to respond.
 A completed activity is never reopened. A later reply creates a new activity
 with a new deadline and a count of ``1``. When merge is disabled, every
 eligible reply creates its own activity, deadline, and notification.
+
+Sender and Automatic-Message Filtering
+--------------------------------------
+
+Exclusions accept exact addresses, domains, and wildcard patterns, for example:
+
+::
+
+   billing-bot@example.com
+   no-reply@*
+   @automated.example.com
+   *.notifications.example.com
+
+Default patterns cover common no-reply, mailer-daemon, and postmaster
+addresses. Use the narrowest suitable pattern and test both a blocked sender
+and a real allowed address before rollout.
+
+Internal senders are recognized through the chatter author and normalized
+email addresses of active and inactive internal users.
+
+When automatic-message filtering is enabled, the module checks standard
+signals such as ``Auto-Submitted``, ``Precedence``, list headers, auto-reply and
+mail-loop headers, empty ``Return-Path`` values, and ``multipart/report``
+delivery messages.
+
+``X-Auto-Response-Suppress`` alone does not classify a message as automatic.
+It can appear on a genuine human email, so an ambiguous value does not hide a
+real customer reply.
+
+Reliability and Security
+------------------------
+
+The standard Odoo route stores the reply before activity processing begins.
+Database savepoints prevent an activity-specific problem from removing that
+accepted chatter message. Database locks prevent two workers from processing
+the same ``Message-Id`` or creating competing merged activities, and an index
+keeps the open-activity search efficient.
+
+Rule management is limited to system administrators. Daily users work with
+standard activities and business records, so existing access rights remain in
+effect. The module does not request or store mailbox passwords.
+
+Scope and Limitations
+---------------------
+
+* Only replies connected through ``In-Reply-To`` or ``References`` are
+  processed.
+* The selected model must support both chatter and activities.
+* Activity creation requires an eligible primary or fallback user.
+* Deadlines are calendar dates; business hours, holidays, and hour-based
+  targets require an extension.
+* Rules apply to a complete technical model. Record domains, team conditions,
+  company-specific policies, and different service levels are not included.
+* Escalations, response-time reports, Helpdesk integration, and external
+  collaboration-channel notifications are outside the base module.
+* The module is not an email client or a Helpdesk replacement.
+
+Validation Summary
+------------------
+
+The post-install suite contains nine focused tests covering the activity type,
+external reply creation and merging, completed activities, disabled merge,
+fallback assignment, internal senders, automatic-message classification, and
+exact, domain, and wildcard exclusions.
+
+The suite was executed twice after the final notification and mail-filtering
+changes. Both executions completed all nine tests successfully across 1,118
+database queries.
+
+The implementation report records 23 validated business and technical
+scenarios. The testing guide in ``doc`` expands the repeatable acceptance plan
+to 33 scenarios with expected results, evidence requirements, regression
+checks, rollout steps, and final sign-off.
+
+Technical Information
+---------------------
+
+* Technical name: ``mail_customer_reply_activity``
+* Dependency: ``mail``
+* License: ``LGPL-3``
+* Documentation: ``doc`` folder
+* Support: `full.stack.odoo@gmail.com <mailto:full.stack.odoo@gmail.com>`_
