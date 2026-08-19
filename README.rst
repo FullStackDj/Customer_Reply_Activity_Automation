@@ -145,3 +145,59 @@ Rule Fields
 **Excluded Addresses**
   Sender addresses or patterns separated by new lines, spaces, commas, or
   semicolons. Matching is case-insensitive after sender normalization.
+
+Quick Start Example
+~~~~~~~~~~~~~~~~~~~
+
+Example rule for CRM Opportunities:
+
+* Model: **Opportunity**
+* Responsible Field: **Salesperson**
+* Fallback Responsible: **Sales Manager**
+* Activity Type: **Customer Reply**
+* Reaction Time: **2 Days**
+* Merge Replies: **Enabled**
+* Ignore Automatic Messages: **Enabled**
+
+An eligible reply remains in the Opportunity chatter and creates an activity
+for the Salesperson. If no eligible Salesperson exists, the Sales Manager
+receives it through the fallback setting.
+
+Routing and Assignment
+----------------------
+
+Odoo first receives the email, finds its parent through ``In-Reply-To`` or
+``References``, routes it to the related record, and stores it in chatter. The
+module then checks the active model rule, sender, exclusions, automatic-message
+indicators, activity type, and responsible users.
+
+Assignment follows a fixed order:
+
+#. Read users from the Responsible Field.
+#. Keep only active internal users and remove duplicates.
+#. Create or merge one activity for every eligible primary user.
+#. Use the Fallback Responsible only when no eligible primary user remains.
+#. Create no activity when neither level provides an eligible user.
+
+The module never selects an unrelated administrator. If no responsible user is
+available, the reply stays in chatter and the condition is written to the Odoo
+server log. A ``Many2many`` field creates a separate activity for each eligible
+user.
+
+A new email sent to an alias without a valid reply relationship follows normal
+Odoo behavior but is not treated as a customer reply by this module.
+
+Merge, Deadlines, and Notifications
+-----------------------------------
+
+With **Merge Replies** enabled, the first reply creates an activity with a
+reply count of ``1``. A later reply updates the same open activity when the
+rule, model, record, and responsible user match.
+
+The update stores the latest sender, subject, message, and received time. It
+increases the reply count and sends one new reminder. The original deadline
+does not move because the first reply started the responsibility to respond.
+
+A completed activity is never reopened. A later reply creates a new activity
+with a new deadline and a count of ``1``. When merge is disabled, every
+eligible reply creates its own activity, deadline, and notification.
